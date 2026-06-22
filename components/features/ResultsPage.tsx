@@ -10,10 +10,13 @@ import { QuizMode } from "@/components/features/QuizMode";
 import { SignupSheet } from "@/components/features/SignupSheet";
 import { SkeletonExplanation } from "@/components/ui/Skeleton";
 import { fetchLevelExplanation } from "@/lib/api";
+import { saveQuizScore } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 interface ResultsPageProps {
   data:    DecodeResult;
   onReset: () => void;
+  user?:   User | null;
 }
 
 type Tab = "explain" | "takeaways" | "audio" | "quiz";
@@ -41,7 +44,7 @@ const DEX_TAB_SAYS: Record<Tab, string> = {
   quiz:      "🎯 Let's see how much stuck. No pressure — it's just between us!",
 };
 
-export default function ResultsPage({ data, onReset }: ResultsPageProps) {
+export default function ResultsPage({ data, onReset, user }: ResultsPageProps) {
   const [tab,           setTab]           = useState<Tab>("explain");
   const [level,         setLevel]         = useState<Level>("Age 12");
   const [explanations,  setExplanations]  = useState<Partial<Record<Level, string>>>(
@@ -69,13 +72,41 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
   }, [explanations, data.summary]);
 
   const openSignup = (trigger: typeof signupTrigger) => {
+    // If already signed in don't show signup
+    if (user && trigger === "share") {
+      // Just share directly
+      if (navigator.share) {
+        navigator.share({
+          title: data.title,
+          text:  data.summary,
+          url:   window.location.href,
+        });
+      } else {
+        navigator.clipboard.writeText(window.location.href);
+        alert("Link copied to clipboard!");
+      }
+      return;
+    }
+    if (user) return;
     setSignupTrigger(trigger);
     setSignupOpen(true);
   };
 
+  const handleQuizComplete = useCallback(async (score: number, total: number) => {
+    if (user && data.id) {
+      try {
+        await saveQuizScore(user.id, data.id, score, total);
+      } catch (e) {
+        console.error("Failed to save quiz score:", e);
+      }
+    } else if (!user) {
+      setSignupTrigger("quiz");
+      setSignupOpen(true);
+    }
+  }, [user, data.id]);
+
   const explanation = explanations[level] ?? "";
 
-  // Build full audio text from summary + takeaways
   const audioText = [
     `Here is your audio summary of: ${data.title}.`,
     data.summary,
@@ -106,14 +137,21 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
               {data.pages} pages · {data.wordCount?.toLocaleString()} words · Decoded ✨
             </p>
           </div>
-          <button
-            onClick={() => openSignup("share")}
-            className="shrink-0 px-3 py-1.5 rounded-lg
-                       bg-purple-100 text-purple-700 text-xs font-bold
-                       hover:bg-purple-200 transition-colors"
-          >
-            Share
-          </button>
+          {/* Show user email or share button */}
+          {user ? (
+            <span className="shrink-0 px-3 py-1.5 rounded-lg bg-teal-100 text-teal-700 text-xs font-bold">
+              ✓ Saved
+            </span>
+          ) : (
+            <button
+              onClick={() => openSignup("share")}
+              className="shrink-0 px-3 py-1.5 rounded-lg
+                         bg-purple-100 text-purple-700 text-xs font-bold
+                         hover:bg-purple-200 transition-colors"
+            >
+              Share
+            </button>
+          )}
         </div>
       </div>
 
@@ -159,7 +197,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
               <div
                 className="rounded-2xl border-2 p-5"
                 style={{
-                  background: "linear-gradient(135deg, rgba(139,92,246,0.04) 0%, rgba(20,184,166,0.05) 100%)",
+                  background:  "linear-gradient(135deg, rgba(139,92,246,0.04) 0%, rgba(20,184,166,0.05) 100%)",
                   borderColor: "rgba(139,92,246,0.18)",
                 }}
               >
@@ -294,12 +332,13 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
                   Quiz Time
                 </h2>
                 <p className="text-sm text-muted mt-0.5">
-                  {data.quiz?.length ?? 10} questions · See how much stuck
+                  {data.quiz?.length ?? 5} questions · See how much stuck
                 </p>
               </div>
               <QuizMode
                 questions={data.quiz ?? []}
                 onSignupTrigger={() => openSignup("quiz")}
+                onComplete={handleQuizComplete}
               />
             </div>
           )}
@@ -321,7 +360,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
             className="btn-primary flex-1 py-3 text-sm"
             onClick={() => openSignup("share")}
           >
-            Share summary ↗
+            {user ? "Share summary ↗" : "Sign in to share ↗"}
           </button>
           <button
             className="btn-secondary py-3 px-4 text-sm"
@@ -341,4 +380,4 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
       />
     </div>
   );
-}
+      }
