@@ -42,16 +42,15 @@ const DEX_TAB_SAYS: Record<Tab, string> = {
 };
 
 export default function ResultsPage({ data, onReset }: ResultsPageProps) {
-  const [tab,          setTab]          = useState<Tab>("explain");
-  const [level,        setLevel]        = useState<Level>("Age 12");
-  const [explanations, setExplanations] = useState<Partial<Record<Level, string>>>(
+  const [tab,           setTab]           = useState<Tab>("explain");
+  const [level,         setLevel]         = useState<Level>("Age 12");
+  const [explanations,  setExplanations]  = useState<Partial<Record<Level, string>>>(
     data.explanations ?? {}
   );
-  const [loadingLevel, setLoadingLevel] = useState(false);
-  const [signupOpen,   setSignupOpen]   = useState(false);
+  const [loadingLevel,  setLoadingLevel]  = useState(false);
+  const [signupOpen,    setSignupOpen]    = useState(false);
   const [signupTrigger, setSignupTrigger] = useState<"quiz" | "share" | "limit">("quiz");
 
-  // Level switch — fetch if not cached
   const handleLevelChange = useCallback(async (next: Level) => {
     setLevel(next);
     if (explanations[next]) return;
@@ -76,10 +75,19 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
 
   const explanation = explanations[level] ?? "";
 
+  // Build full audio text from summary + takeaways
+  const audioText = [
+    `Here is your audio summary of: ${data.title}.`,
+    data.summary,
+    "Here are the key takeaways.",
+    ...(data.takeaways ?? []).map((t, i) => `Takeaway ${i + 1}: ${t}`),
+    data.whyItMatters ? `Why this matters: ${data.whyItMatters}` : "",
+  ].filter(Boolean).join(" ");
+
   return (
     <div className="mobile-container overflow-hidden">
 
-      {/* ── Sticky top bar ── */}
+      {/* Sticky top bar */}
       <div className="sticky top-0 z-20 bg-bg/90 bg-blur-card border-b border-border-purple">
         <div className="flex items-center gap-3 px-4 py-3">
           <button
@@ -109,7 +117,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
         </div>
       </div>
 
-      {/* ── Scrollable body ── */}
+      {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
 
         {/* Dex intro */}
@@ -137,21 +145,17 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
           </div>
         </div>
 
-        {/* ── Tab content ── */}
+        {/* Tab content */}
         <div className="px-4 pb-24">
 
-          {/* ══ EXPLAIN ══ */}
+          {/* EXPLAIN */}
           {tab === "explain" && (
             <div className="flex flex-col gap-4 animate-fade-up">
-
-              {/* Level selector */}
               <LevelSelector
                 active={level}
                 onChange={handleLevelChange}
                 loading={loadingLevel}
               />
-
-              {/* ELI card */}
               <div
                 className="rounded-2xl border-2 p-5"
                 style={{
@@ -159,21 +163,18 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
                   borderColor: "rgba(139,92,246,0.18)",
                 }}
               >
-                {/* Card header */}
                 <div className="flex items-center gap-2 mb-4">
                   <span
                     className="px-2.5 py-1 rounded-lg text-2xs font-black text-white uppercase tracking-wide"
                     style={{ background: "linear-gradient(135deg, #8B5CF6, #7C3AED)" }}
                   >
                     {LEVELS.find(l => l.id === level)?.emoji}{" "}
-                    {level === "Age 8"  ? "ELI8"    :
-                     level === "Age 12" ? "ELI12"   :
-                     level === "College"? "College" : "Expert"}
+                    {level === "Age 8"   ? "ELI8"    :
+                     level === "Age 12"  ? "ELI12"   :
+                     level === "College" ? "College" : "Expert"}
                   </span>
                   <span className="text-xs text-muted font-medium">Plain English</span>
                 </div>
-
-                {/* Explanation text or skeleton */}
                 {loadingLevel ? (
                   <SkeletonExplanation />
                 ) : (
@@ -183,7 +184,6 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
                 )}
               </div>
 
-              {/* Why it matters */}
               {data.whyItMatters && (
                 <div className="card p-5">
                   <div className="flex items-center gap-2 mb-3">
@@ -196,7 +196,6 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
                 </div>
               )}
 
-              {/* Summary chip */}
               <div className="card-subtle p-4">
                 <p className="section-label mb-2">Quick summary</p>
                 <p className="text-sm text-ink leading-relaxed">{data.summary}</p>
@@ -204,7 +203,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
             </div>
           )}
 
-          {/* ══ TAKEAWAYS ══ */}
+          {/* TAKEAWAYS */}
           {tab === "takeaways" && (
             <div className="flex flex-col gap-3 animate-fade-up">
               <div className="mb-1">
@@ -223,10 +222,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
                   )}
                   style={{ animationDelay: `${i * 0.07}s` }}
                 >
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center
-                               text-lg shrink-0 bg-white shadow-sm"
-                  >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 bg-white shadow-sm">
                     {TAKEAWAY_ICONS[i % TAKEAWAY_ICONS.length]}
                   </div>
                   <div>
@@ -238,12 +234,11 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
                 </div>
               ))}
 
-              {/* Why it matters */}
               {data.whyItMatters && (
                 <div
                   className="rounded-2xl p-5 mt-1 animate-fade-up"
                   style={{
-                    background:   "linear-gradient(135deg, #8B5CF6 0%, #14B8A6 100%)",
+                    background:     "linear-gradient(135deg, #8B5CF6 0%, #14B8A6 100%)",
                     animationDelay: "0.4s",
                   }}
                 >
@@ -258,7 +253,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
             </div>
           )}
 
-          {/* ══ AUDIO ══ */}
+          {/* AUDIO */}
           {tab === "audio" && (
             <div className="flex flex-col gap-4 animate-fade-up">
               <div className="mb-1">
@@ -268,13 +263,12 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
                 <p className="text-sm text-muted mt-0.5">Listen on the go</p>
               </div>
 
-              <AudioPlayer />
+              <AudioPlayer text={audioText} />
 
               <div className="card p-4">
                 <p className="text-xs font-bold text-purple-700 mb-2">🎧 Pro tip</p>
                 <p className="text-sm text-muted leading-relaxed">
-                  Try 1.5× speed for commute listening. The audio covers all 5 key takeaways
-                  in around 3 minutes.
+                  Try 1.5× speed for commute listening. The audio covers all 5 key takeaways in around 3 minutes.
                 </p>
               </div>
 
@@ -292,7 +286,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
             </div>
           )}
 
-          {/* ══ QUIZ ══ */}
+          {/* QUIZ */}
           {tab === "quiz" && (
             <div className="animate-fade-up">
               <div className="mb-4">
@@ -313,13 +307,13 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
         </div>
       </div>
 
-      {/* ── Bottom action bar ── */}
+      {/* Bottom action bar */}
       <div
         className="sticky bottom-0 left-0 right-0 z-10 px-4 py-3 safe-bottom"
         style={{
-          background:   "rgba(250,245,255,0.92)",
+          background:     "rgba(250,245,255,0.92)",
           backdropFilter: "blur(12px)",
-          borderTop:    "1px solid rgba(139,92,246,0.1)",
+          borderTop:      "1px solid rgba(139,92,246,0.1)",
         }}
       >
         <div className="flex gap-2.5">
@@ -339,7 +333,7 @@ export default function ResultsPage({ data, onReset }: ResultsPageProps) {
         </div>
       </div>
 
-      {/* ── Signup sheet ── */}
+      {/* Signup sheet */}
       <SignupSheet
         open={signupOpen}
         onClose={() => setSignupOpen(false)}
