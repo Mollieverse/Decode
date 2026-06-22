@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { DexMascot } from "@/components/ui/DexMascot";
 
 interface SignupSheetProps {
@@ -25,11 +26,20 @@ const TRIGGER_COPY = {
 };
 
 export function SignupSheet({ open, onClose, trigger }: SignupSheetProps) {
-  const [mounted, setMounted] = useState(false);
+  const [mounted,  setMounted]  = useState(false);
+  const [email,    setEmail]    = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [sent,     setSent]     = useState(false);
+  const [error,    setError]    = useState("");
+  const [mode,     setMode]     = useState<"options" | "email">("options");
 
   useEffect(() => {
     if (open) {
       setMounted(true);
+      setMode("options");
+      setSent(false);
+      setError("");
+      setEmail("");
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -37,6 +47,43 @@ export function SignupSheet({ open, onClose, trigger }: SignupSheetProps) {
       return () => clearTimeout(t);
     }
   }, [open]);
+
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (e: any) {
+      setError(e.message);
+      setLoading(false);
+    }
+  };
+
+  const handleEmail = async () => {
+    if (!email) return;
+    setLoading(true);
+    setError("");
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      setSent(true);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!mounted) return null;
 
@@ -47,10 +94,8 @@ export function SignupSheet({ open, onClose, trigger }: SignupSheetProps) {
       className="fixed inset-0 z-50 flex items-end justify-center"
       style={{ background: open ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0)" }}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      {/* Sheet */}
       <div
         className="relative w-full max-w-[480px] bg-white rounded-t-3xl px-6 pt-6 pb-10 safe-bottom"
         style={{
@@ -74,29 +119,69 @@ export function SignupSheet({ open, onClose, trigger }: SignupSheetProps) {
           {copy.body}
         </p>
 
-        {/* Social auth */}
-        <div className="flex flex-col gap-3 mb-4">
-          <button className="btn-primary">
-            🚀 Continue with Google
-          </button>
-          <button className="btn-secondary">
-            📧 Sign up with email
-          </button>
-        </div>
-
-        {/* Fine print */}
-        <p className="text-2xs text-ghost text-center">
-          Free forever · No credit card · Cancel anytime
-        </p>
-
-        {/* Dismiss */}
-        <button
-          className="btn-ghost w-full mt-3 text-sm"
-          onClick={onClose}
-        >
-          Maybe later
-        </button>
+        {/* Sent confirmation */}
+        {sent ? (
+          <div className="text-center py-4">
+            <div className="text-4xl mb-3">📬</div>
+            <p className="font-bold text-ink mb-1">Check your email!</p>
+            <p className="text-sm text-muted">We sent a magic link to <strong>{email}</strong>. Tap it to sign in.</p>
+            <button className="btn-ghost w-full mt-4" onClick={onClose}>Close</button>
+          </div>
+        ) : mode === "options" ? (
+          <>
+            <div className="flex flex-col gap-3 mb-4">
+              <button
+                className="btn-primary"
+                onClick={handleGoogle}
+                disabled={loading}
+              >
+                {loading ? "Redirecting..." : "🚀 Continue with Google"}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => setMode("email")}
+              >
+                📧 Sign up with email
+              </button>
+            </div>
+            {error && <p className="text-xs text-red-500 text-center mb-2">{error}</p>}
+            <p className="text-2xs text-ghost text-center">
+              Free forever · No credit card · Cancel anytime
+            </p>
+            <button className="btn-ghost w-full mt-3 text-sm" onClick={onClose}>
+              Maybe later
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3 mb-4">
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full px-4 py-3.5 rounded-xl border-2 border-purple-200
+                           text-ink text-sm font-medium outline-none
+                           focus:border-purple-500 transition-colors"
+              />
+              <button
+                className="btn-primary"
+                onClick={handleEmail}
+                disabled={loading || !email}
+              >
+                {loading ? "Sending..." : "✉️ Send magic link"}
+              </button>
+              <button
+                className="btn-ghost text-sm"
+                onClick={() => setMode("options")}
+              >
+                ← Back
+              </button>
+            </div>
+            {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+          </>
+        )}
       </div>
     </div>
   );
-}
+              }
